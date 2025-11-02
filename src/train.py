@@ -331,8 +331,13 @@ def main():
     print("Starting training...")
     ARCHITECTURE, B, CPU_WORKERS, DEVICE, K, LR, N, PAT, SUBSAMPLE_SIZE, WD = parse_args(docopt(__doc__))
 
-    path = kagglehub.dataset_download("akash2sharma/tiny-imagenet")
-    print("Path to dataset files:", path)
+    cached_path = os.path.expanduser("~/.cache/kagglehub/datasets/akash2sharma/tiny-imagenet/versions/1")
+    if os.path.isdir(cached_path):
+        path = cached_path
+        print("Using existing dataset cache:", path)
+    else:
+        path = kagglehub.dataset_download("akash2sharma/tiny-imagenet")
+        print("Downloaded dataset to:", path)
 
     full = datasets.ImageFolder(
         root=os.path.join(path, 'tiny-imagenet-200', 'train'),
