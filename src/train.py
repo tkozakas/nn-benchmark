@@ -21,7 +21,6 @@ Options:
     --epochs=N              Max epochs per fold [default: 20].
     --batch-size=B          Training batch size [default: 128].
     --lr=LR                 Learning rate [default: 0.001].
-    --weight-decay=WD       Weight decay (L2) [default: 0.0001].
     --patience=P            Early-stop patience [default: 5].
 """
 
@@ -165,6 +164,12 @@ def init_model_optimizer_scheduler(model_fn, learning_rate,
                                    device):
     """Instantiate model, optimizer, and scheduler."""
     model = model_fn().to(device)
+
+    # Multi-GPU support: use DataParallel if multiple GPUs available
+    if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+        print(f"[INFO] Using {torch.cuda.device_count()} GPUs with DataParallel")
+        model = nn.DataParallel(model)
+
     optimizer = optimizer_fn(model.parameters()) if optimizer_fn else optim.Adam(
         model.parameters(), lr=learning_rate, weight_decay=weight_decay
     )
@@ -330,7 +335,7 @@ def train(architecture,
 
 def main():
     print("Starting training...")
-    ARCHITECTURE, B, CPU_WORKERS, DEVICE, K, LR, N, PAT, SUBSAMPLE_SIZE, WD = parse_args(docopt(__doc__))
+    ARCHITECTURE, B, CPU_WORKERS, DEVICE, K, LR, N, PAT, SUBSAMPLE_SIZE = parse_args(docopt(__doc__))
 
     project_root = Path(__file__).parent.parent.resolve()
     local_base = project_root / 'dataset'
@@ -359,7 +364,6 @@ def main():
         epochs=N,
         batch_size=B,
         learning_rate=LR,
-        weight_decay=WD,
         early_stopping_patience=PAT,
         cpu_workers=CPU_WORKERS,
         optimizer_fn=optim.Adam,

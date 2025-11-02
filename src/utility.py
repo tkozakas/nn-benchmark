@@ -42,7 +42,6 @@ def parse_args(args):
     N = int(args['--epochs'])
     B = int(args['--batch-size'])
     LR = float(args['--lr'])
-    WD = float(args['--weight-decay'])
     CPU_WORKERS = int(args['--cpu-workers'])
     DEVICE = args['--device']
 
@@ -62,7 +61,6 @@ def parse_args(args):
           f"N={N} epochs, "
           f"B={B} batch size, "
           f"LR={LR} learning rate, "
-          f"WD={WD} weight decay, "
           f"PAT={PAT} patience, "
           f"CPU_WORKERS={CPU_WORKERS} workers")
 
@@ -75,6 +73,5 @@ def parse_args(args):
         LR,
         N,
         PAT,
-        SUBSAMPLE_SIZE,
-        WD
+        SUBSAMPLE_SIZE
     )

@@ -21,7 +21,6 @@ Options:
     --epochs=N              Max epochs per fold             [default: 10].
     --batch-size=B          Training batch size             [default: 128].
     --lr=LR                 Learning rate                   [default: 0.001].
-    --weight-decay=WD       Weight decay (L2)               [default: 0.0001].
     --patience=P            Early-stop patience             [default: None].
 """
 
@@ -182,7 +181,7 @@ def main():
     full_ds = datasets.ImageFolder(root=data_root, transform=transform)
 
     print("Running experiments...")
-    ARCHITECTURE, B, CPU_WORKERS, DEVICE, K, LR, N, PAT, SUBSAMPLE_SIZE, WD = parse_args(docopt(__doc__))
+    ARCHITECTURE, B, CPU_WORKERS, DEVICE, K, LR, N, PAT, SUBSAMPLE_SIZE = parse_args(docopt(__doc__))
     ds = get_subsample(full_ds, SUBSAMPLE_SIZE)
 
     # 1) Learning rate comparison
@@ -200,7 +199,6 @@ def main():
             k_folds=K, epochs=N, batch_size=B,
             learning_rate=lr,
             optimizer_fn=None,
-            weight_decay=WD,
             early_stopping_patience=PAT,
             cpu_workers=CPU_WORKERS,
             device=DEVICE
@@ -222,7 +220,6 @@ def main():
             name, ARCHITECTURE, ds,
             k_folds=K, epochs=N, batch_size=B,
             learning_rate=LR, optimizer_fn=opt_fn,
-            weight_decay=WD,
             early_stopping_patience=PAT,
             cpu_workers=CPU_WORKERS,
             device=DEVICE
@@ -248,7 +245,6 @@ def main():
             name, ARCHITECTURE, ds,
             k_folds=K, epochs=N, batch_size=B,
             learning_rate=LR, optimizer_fn=best_opt_fn, scheduler_fn=scheduler,
-            weight_decay=WD,
             early_stopping_patience=PAT,
             cpu_workers=CPU_WORKERS,
             device=DEVICE
@@ -261,35 +257,7 @@ def main():
     best_sched_fn = sched_map[best_sched]
     print(f"Best scheduler: {best_sched}")
 
-    # 4) Regularization Comparison
-    print("Running regularization comparison...")
-    reg_map = {
-        'No WD': 0.0,
-        'WD=1e-6': 1e-8,
-        'WD=1e-4': 1e-4,
-        'WD=1e-2': 1e-2,
-        'WD=1e-1': 1e-1,
-    }
-    runs = [
-        run_experiment(
-            name, ARCHITECTURE, ds,
-            k_folds=K, epochs=N, batch_size=B,
-            learning_rate=LR, optimizer_fn=best_opt_fn,
-            scheduler_fn=best_sched_fn,
-            weight_decay=wd,
-            early_stopping_patience=PAT,
-            cpu_workers=CPU_WORKERS,
-            device=DEVICE
-        )
-        for name, wd in reg_map.items()
-    ]
-    save_test_data(runs, '../test_data/regularization_comparison.csv')
-    plot_regularization_comparison(runs, 'regularization_comparison')
-    best_reg = max(runs, key=lambda r: r['test_f1_score'])['name']
-    best_wd = reg_map[best_reg]
-    print(f"Best weight decay: {best_reg}")
-
-    # 5) Batch Size Comparison
+    # 4) Batch Size Comparison
     print("Running batch size comparison...")
     batch_sizes = [64, 128, 256, 512]
     runs_bs = [
@@ -298,7 +266,6 @@ def main():
             k_folds=K, epochs=N, batch_size=b,
             learning_rate=LR, optimizer_fn=best_opt_fn,
             scheduler_fn=best_sched_fn,
-            weight_decay=best_wd,
             early_stopping_patience=PAT,
             cpu_workers=CPU_WORKERS,
             device=DEVICE
@@ -310,7 +277,7 @@ def main():
     best_bs = max(runs_bs, key=lambda r: r['test_f1_score'])['batch_size']
     print(f"Best batch size: {best_bs}")
 
-    # 6) Architecture Comparison (use supported_architectures)
+    # 5) Architecture Comparison (use supported_architectures)
     print("Running final architecture comparison...")
     archs = list(supported_architectures.keys())
     runs = [
@@ -319,7 +286,6 @@ def main():
             k_folds=K, epochs=N, batch_size=best_bs,
             learning_rate=LR, optimizer_fn=best_opt_fn,
             scheduler_fn=best_sched_fn,
-            weight_decay=best_wd,
             early_stopping_patience=PAT,
             cpu_workers=CPU_WORKERS,
             device=DEVICE

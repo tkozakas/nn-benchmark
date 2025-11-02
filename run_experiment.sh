@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --partition=gpu
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:4
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
@@ -26,9 +26,8 @@ python experiment.py \
   --architecture ResNet50 \
   --device cuda \
   --cpu-workers 8 \
-  --k-folds 5 \
-  --epochs 30 \
+  --k-folds 3 \
+  --epochs 20 \
   --batch-size 256 \
   --lr 0.0001 \
-  --patience 5 \
-  --weight-decay 0.0001
+  --patience 5
