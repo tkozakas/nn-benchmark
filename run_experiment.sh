@@ -20,6 +20,13 @@ source .venv/bin/activate
 uv pip install -r requirements.txt
 uv pip install torch torchvision torchaudio nvidia-ml-py
 
+mkdir dataset
+cd dataset
+
+curl -L -o . \                                                                                                                                                                                                                                       nn-benchmark/tiny-imagenet-200 master
+  https://www.kaggle.com/api/v1/datasets/download/akash2sharma/tiny-imagenet
+unzip tiny-imagenet.zip
+
 # run experiment
 cd src
 python experiment.py \
