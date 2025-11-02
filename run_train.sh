@@ -14,11 +14,11 @@ source $HOME/.local/bin/env
 
 rm -rf .venv
 uv python install 3.12
-uv venv --python 3.12 --clear
+uv venv --python 3.12
 source .venv/bin/activate
 
 uv pip install -r requirements.txt
-uv pip install torch torchvision torchaudio nvidia-ml-py
+uv pip install torch torchvision torchaudio
 
 # run training
 cd src
