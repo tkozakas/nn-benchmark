@@ -40,16 +40,6 @@ uv pip install -r requirements.txt
 # uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 ```
 
-## Dataset
-Place/extract TinyImageNet so that training images live at (default):
-```
-./data/tiny-imagenet-200/train
-```
-Override with env var:
-```bash
-export TINY_IMAGENET_ROOT=/custom/path/to/tiny-imagenet-200/train
-```
-
 ## Quick Experiment Run
 Example: run the full comparison pipeline starting from ResNet18.
 ```bash
@@ -82,10 +72,3 @@ python train.py --architecture ResNet18 --device cuda --epochs 5 --batch-size 12
 
 ## Retrieving Results
 CSV summaries & plots are written under `test_data/` and trained model weights under `trained/`.
-
-## Extending
-1. Add a new architecture: edit `supported_architectures` in `config.py` and implement its constructor in `model.get_model`.
-2. Add a new comparison dimension: create a mapping and loop similar to existing blocks in `experiment.py`.
-
-## License / Notes
-This refactored version removed all EMNIST‑specific code and custom CNN definitions; only torchvision models are used.
