@@ -1,0 +1,6 @@
+.idea
+data
+venv
+test_data
+trained
+__pycache__
