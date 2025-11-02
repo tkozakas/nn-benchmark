@@ -66,8 +66,9 @@ python train.py --architecture ResNet18 --device cuda --epochs 5 --batch-size 12
 ```
 
 ## HPC Batch Script Example
-(See `run_experiment.sh` – simplified to use a supported architecture.)
 ```bash
+chmod +x *.sh
+./setup.sh
 ./follow_logs.sh $(sbatch --parsable run_experiment.sh)
 ```
 
