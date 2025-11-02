@@ -2,14 +2,28 @@ import torch
 from torchvision import transforms
 
 
-def get_transforms():
-    # TinyImageNet images are 64x64; convert to 3-channel tensor & normalize.
-    return transforms.Compose([
-        transforms.Resize((64, 64)),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
-    ])
+def get_transforms(augment=True):
+    """Get transforms for TinyImageNet (64x64 images).
+
+    Args:
+        augment: If True, applies strong data augmentation for training
+    """
+    if augment:
+        return transforms.Compose([
+            transforms.Resize((64, 64)),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomRotation(15),
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+            transforms.RandomCrop(64, padding=4),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+        ])
+    else:
+        return transforms.Compose([
+            transforms.Resize((64, 64)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+        ])
 
 
 def get_subsample(full_dataset, subsample_size):
