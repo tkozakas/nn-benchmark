@@ -47,3 +47,4 @@ typing_extensions
 importlib_resources
 optuna
 opencv-python
+kagglehub
