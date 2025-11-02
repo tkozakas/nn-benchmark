@@ -34,6 +34,7 @@ import warnings
 import kagglehub
 import psutil
 import torch
+from pathlib import Path
 from docopt import docopt
 from sklearn.exceptions import UndefinedMetricWarning
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score
@@ -331,9 +332,10 @@ def main():
     print("Starting training...")
     ARCHITECTURE, B, CPU_WORKERS, DEVICE, K, LR, N, PAT, SUBSAMPLE_SIZE, WD = parse_args(docopt(__doc__))
 
-    cached_path = os.path.expanduser("~/.cache/kagglehub/datasets/akash2sharma/tiny-imagenet/versions/1")
-    if os.path.isdir(cached_path):
-        path = cached_path
+    project_root = Path(__file__).parent.parent.resolve()
+    local_base = project_root / 'dataset'
+    if os.path.isdir(local_base):
+        path = local_base
         print("Using existing dataset cache:", path)
     else:
         path = kagglehub.dataset_download("akash2sharma/tiny-imagenet")

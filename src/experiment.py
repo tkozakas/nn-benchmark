@@ -33,7 +33,7 @@ import pandas as pd
 import torch
 from docopt import docopt
 from torchvision import datasets
-
+from pathlib import Path
 from config import supported_architectures
 from model import get_model
 from train import train, transform
@@ -169,9 +169,10 @@ def save_test_data(data, filename):
 
 
 def main():
-    cached_path = os.path.expanduser("~/.cache/kagglehub/datasets/akash2sharma/tiny-imagenet/versions/1")
-    if os.path.isdir(cached_path):
-        path = cached_path
+    project_root = Path(__file__).parent.parent.resolve()
+    local_base = project_root / 'dataset'
+    if os.path.isdir(local_base):
+        path = local_base
         print("Using existing dataset cache:", path)
     else:
         path = kagglehub.dataset_download("akash2sharma/tiny-imagenet")
