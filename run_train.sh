@@ -23,7 +23,7 @@ uv pip install torch torchvision torchaudio
 # run training
 cd src
 python train.py \
-  --architecture ResNet18 \
+  --architecture ResNet50 \
   --device cuda \
   --cpu-workers 8 \
   --k-folds 5 \

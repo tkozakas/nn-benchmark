@@ -23,9 +23,9 @@ uv pip install torch torchvision torchaudio
 # run experiment
 cd src
 python experiment.py \
-  --architecture ResNet18 \
+  --architecture ResNet50 \
   --device cuda \
-  --cpu-workers 10 \
+  --cpu-workers 8 \
   --k-folds 5 \
   --epochs 30 \
   --batch-size 256 \
