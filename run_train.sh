@@ -23,8 +23,8 @@ uv pip install torch torchvision torchaudio nvidia-ml-py
 mkdir dataset
 cd dataset
 
-curl -L -o . \                                                                                                                                                                                                                                       nn-benchmark/tiny-imagenet-200 master
-  https://www.kaggle.com/api/v1/datasets/download/akash2sharma/tiny-imagenet
+curl -L -o . \
+https://www.kaggle.com/api/v1/datasets/download/akash2sharma/tiny-imagenet
 unzip tiny-imagenet.zip
 
 # run training
