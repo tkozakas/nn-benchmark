@@ -28,6 +28,6 @@ python train.py \
   --cpu-workers 8 \
   --k-folds 3 \
   --epochs 20 \
-  --batch-size 128 \
+  --batch-size 1024 \
   --lr 0.001 \
   --patience 5
