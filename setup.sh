@@ -9,13 +9,6 @@
 
 set -euo pipefail
 
-# Create logs directory
-mkdir -p logs
-
-echo "[SLURM] Job ID: $SLURM_JOB_ID"
-echo "[SLURM] Node: $SLURM_NODELIST"
-echo "[SLURM] Starting at: $(date)"
-
 DATASET_DIR="dataset"
 ZIP_NAME="tiny-imagenet.zip"
 DATASET_URL="http://cs231n.stanford.edu/tiny-imagenet-200.zip"
@@ -28,12 +21,8 @@ fi
 
 mkdir -p "$DATASET_DIR"
 cd "$DATASET_DIR"
-
-echo "[INFO] Downloading TinyImageNet from Stanford mirror..."
 curl -L -o "$ZIP_NAME" "$DATASET_URL"
 
-echo "[INFO] Extracting only train directory (using ${SLURM_CPUS_PER_TASK:-4} CPU cores)..."
-# Extract ONLY the train folder to save time
 unzip -q "$ZIP_NAME" "tiny-imagenet-200/train/*" 2>/dev/null || unzip -q "$ZIP_NAME" "*/train/*"
 
 if [ ! -d "$EXTRACTED_DIR" ]; then
@@ -52,4 +41,3 @@ else
 fi
 
 rm -f "$ZIP_NAME"
-echo "[SLURM] Setup complete at: $(date)"
