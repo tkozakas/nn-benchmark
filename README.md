@@ -36,7 +36,8 @@ source .venv/bin/activate
 ### Install dependencies
 ```bash
 uv pip install -r requirements.txt
-# (Optional) explicit torch install if you need a specific CUDA/ROCm wheel
+uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.2
+# (Optional) explicit torch install if you need a specific CUDA wheel
 # uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 ```
 
