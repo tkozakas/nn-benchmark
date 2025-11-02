@@ -8,6 +8,10 @@
 #SBATCH --job-name=tinyimagenet_benchmark
 #SBATCH --output=logs/tinyimagenet_benchmark_%j.out
 
+# Usage: ./run_experiment.sh [experiment]
+# experiment options: learning-rate | optimizer | scheduler | batch-size | architecture | hpo | architecture-hpo | full
+EXPERIMENT=${1:-full}
+
 # load UV Python & your venv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
@@ -35,4 +39,5 @@ python experiment.py \
   --batch-size 2048 \
   --lr 0.001 \
   --patience 5 \
-  --subsample-size None
+  --subsample-size None \
+  --experiment "$EXPERIMENT"
