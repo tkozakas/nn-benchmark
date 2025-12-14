@@ -261,3 +261,24 @@ def plot_confusion_matrix(model, loader, device, classes):
     ax.set_ylabel('Tikroji klasė')
     ax.set_title('Sumaišties matrica')
     _save_plot(fig, "confusion", "cm")
+
+
+def plot_optimization_comparison(runs, name):
+    """Plot comparison of optimization experiments (pretrained vs scratch, with/without augmentation)."""
+    labels = [r['name'] for r in runs]
+
+    # Training curves
+    _plot_line(runs, 'train_loss_curve', 'Mokymo nuostolis per epochas',
+               'Epochos', 'Nuostolis', 'optimization', name + '_train_loss')
+    _plot_line(runs, 'val_loss_curve', 'Validavimo nuostolis per epochas',
+               'Epochos', 'Nuostolis', 'optimization', name + '_val_loss')
+    _plot_line(runs, 'f1_score_curve', 'Validavimo F1 rodiklis per epochas',
+               'Epochos', 'F1 rodiklis', 'optimization', name + '_val_f1')
+
+    # Bar charts for final metrics
+    _plot_bar(labels, [r['test_f1_score'] for r in runs],
+              'Testavimo F1 rodiklis', 'Konfigūracija', 'F1 rodiklis',
+              'optimization', name + '_test_f1')
+    _plot_bar(labels, [r['training_time'] for r in runs],
+              'Mokymo laikas (s)', 'Konfigūracija', 'Sekundės',
+              'optimization', name + '_training_time')

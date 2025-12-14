@@ -5,14 +5,14 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
 #SBATCH --time=24:00:00
-#SBATCH --job-name=tinyimagenet_benchmark
-#SBATCH --output=logs/tinyimagenet_benchmark_%j.out
+#SBATCH --job-name=optimization_benchmark
+#SBATCH --output=logs/optimization_benchmark_%j.out
 
-# Usage: ./run_experiment.sh [architecture] [k-folds] [epochs] [batch-size] [lr] [patience]
-ARCHITECTURE=${1:-ResNet50}
+# Usage: ./run_optimize.sh [architecture] [k-folds] [epochs] [batch-size] [lr] [patience]
+ARCHITECTURE=${1:-DenseNet121}
 K_FOLDS=${2:-3}
 EPOCHS=${3:-20}
-BATCH_SIZE=${4:-2048}
+BATCH_SIZE=${4:-128}
 LR=${5:-0.001}
 PATIENCE=${6:-5}
 
@@ -28,7 +28,7 @@ if [[ ! -d .venv ]] || [[ requirements.txt -nt .venv ]]; then
   source .venv/bin/activate
   uv pip install -r requirements.txt
   uv pip install torch torchvision torchaudio
-  touch .venv  # Update timestamp
+  touch .venv
 else
   echo "Using cached virtual environment..."
   source .venv/bin/activate
@@ -40,7 +40,7 @@ export OMP_NUM_THREADS=16
 python -c "import torch; print(f'GPUs: {torch.cuda.device_count()}'); [print(f'GPU {i}: {torch.cuda.get_device_name(i)}') for i in range(torch.cuda.device_count())]"
 
 cd src
-python experiment.py \
+python optimize.py \
   --architecture "$ARCHITECTURE" \
   --device cuda \
   --cpu-workers 16 \
@@ -48,5 +48,4 @@ python experiment.py \
   --epochs "$EPOCHS" \
   --batch-size "$BATCH_SIZE" \
   --lr "$LR" \
-  --patience "$PATIENCE" \
-  --subsample-size None
+  --patience "$PATIENCE"

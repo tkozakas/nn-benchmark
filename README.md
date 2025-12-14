@@ -95,6 +95,35 @@ Run experiments from your local machine (syncs code, submits job, streams logs, 
 ./hpc_run.sh --architecture ResNet18 --epochs 10 --batch-size 512
 ```
 
+### Run Optimization Experiment
+Compare pretrained vs from-scratch training with data augmentation (Mixup/CutMix):
+```bash
+./hpc_optimize.sh [OPTIONS]
+```
+
+**Options:**
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--architecture` | `DenseNet121` | Model architecture |
+| `--k-folds` | `3` | Number of CV folds |
+| `--epochs` | `20` | Number of epochs |
+| `--batch-size` | `128` | Batch size |
+| `--lr` | `0.001` | Learning rate |
+| `--patience` | `5` | Early stopping patience |
+
+**Compares 6 configurations:**
+1. From scratch (baseline)
+2. From scratch + Mixup
+3. From scratch + CutMix
+4. Pretrained (transfer learning)
+5. Pretrained + Mixup
+6. Pretrained + CutMix
+
+**Example:**
+```bash
+./hpc_optimize.sh --architecture DenseNet121 --epochs 15 --batch-size 256
+```
+
 ### Cancel Jobs
 ```bash
 ssh -i ~/.ssh/id_ed25519 $HPC_USER@hpc.mif.vu.lt "scancel -u $HPC_USER"
