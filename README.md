@@ -59,18 +59,32 @@ python experiment.py \
 Supported architectures are declared in `config.py` (default: GoogleNet, ResNet18, ResNet50, DenseNet121). Extend that
 mapping to add more.
 
-## Individual Training (debug / smaller scope)
+## Run on VU HPC
+
+### Setup SSH Key
+1. Generate an SSH key (if you haven't already):
+   ```bash
+   ssh-keygen -t ed25519
+   chmod 600 ~/.ssh/id_ed25519
+   ```
+2. Upload your public key (`~/.ssh/id_ed25519.pub`) to [MIF LDAP](https://ldap.mif.vu.lt)
+
+3. Set your username and test connection:
+   ```bash
+   HPC_USER=YOUR_VU_COMPUTER_USERNAME
+   ssh -i ~/.ssh/id_ed25519 $HPC_USER@hpc.mif.vu.lt
+   ```
+
+### Run Experiment
+Run experiments from your local machine (syncs code, submits job, streams logs, copies results back):
 ```bash
-cd src
-python train.py --architecture ResNet18 --device cuda --epochs 5 --batch-size 128
+./hpc_run.sh <experiment>
 ```
 
-## HPC Batch Script Example
+Options: `learning-rate` | `optimizer` | `scheduler` | `batch-size` | `architecture` | `hpo` | `architecture-hpo` | `full`
+
+### Cancel Jobs
 ```bash
-chmod +x *.sh
-./setup.sh
-./follow_logs.sh $(sbatch --parsable run_experiment.sh)
+ssh -i ~/.ssh/id_ed25519 $HPC_USER@hpc.mif.vu.lt "scancel -u $HPC_USER"
 ```
 
-## Retrieving Results
-CSV summaries & plots are written under `test_data/` and trained model weights under `trained/`.
