@@ -95,8 +95,8 @@ Run experiments from your local machine (syncs code, submits job, streams logs, 
 ./hpc_run.sh --architecture ResNet18 --epochs 10 --batch-size 512
 ```
 
-### Run Optimization Experiment
-Compare pretrained vs from-scratch training with data augmentation (Mixup/CutMix):
+### Run Optuna Optimization
+Use Optuna to find the best hyperparameters for a given architecture:
 ```bash
 ./hpc_optimize.sh [OPTIONS]
 ```
@@ -105,24 +105,30 @@ Compare pretrained vs from-scratch training with data augmentation (Mixup/CutMix
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--architecture` | `DenseNet121` | Model architecture |
-| `--k-folds` | `3` | Number of CV folds |
-| `--epochs` | `20` | Number of epochs |
-| `--batch-size` | `128` | Batch size |
-| `--lr` | `0.001` | Learning rate |
+| `--epochs` | `20` | Epochs per trial |
 | `--patience` | `5` | Early stopping patience |
+| `--n-trials` | `30` | Number of Optuna trials |
 
-**Compares 6 configurations:**
-1. From scratch (baseline)
-2. From scratch + Mixup
-3. From scratch + CutMix
-4. Pretrained (transfer learning)
-5. Pretrained + Mixup
-6. Pretrained + CutMix
+**Optimizes:**
+- `pretrained`: True / False
+- `augmentation`: none / mixup / cutmix
+- `lr`: 1e-5 to 1e-2 (log scale)
+- `batch_size`: 64, 128, 256
+- `weight_decay`: 1e-6 to 1e-2 (log scale)
+- `optimizer`: adam, adamw, sgd
 
 **Example:**
 ```bash
-./hpc_optimize.sh --architecture DenseNet121 --epochs 15 --batch-size 256
+# Quick test (5 trials, 10 epochs)
+./hpc_optimize.sh --architecture DenseNet121 --epochs 10 --n-trials 5
+
+# Full optimization
+./hpc_optimize.sh --architecture DenseNet121 --epochs 20 --n-trials 50
 ```
+
+**Output:**
+- `test_data/optuna_<arch>.csv` - All trial results
+- `test_data/optuna_<arch>_best.csv` - Best configuration with 3-fold CV results
 
 ### Cancel Jobs
 ```bash

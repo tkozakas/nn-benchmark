@@ -28,7 +28,7 @@ if [[ ! -d .venv ]] || [[ requirements.txt -nt .venv ]]; then
   source .venv/bin/activate
   uv pip install -r requirements.txt
   uv pip install torch torchvision torchaudio
-  touch .venv  # Update timestamp
+  touch .venv
 else
   echo "Using cached virtual environment..."
   source .venv/bin/activate

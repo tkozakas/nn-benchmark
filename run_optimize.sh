@@ -8,13 +8,11 @@
 #SBATCH --job-name=optimization_benchmark
 #SBATCH --output=logs/optimization_benchmark_%j.out
 
-# Usage: ./run_optimize.sh [architecture] [k-folds] [epochs] [batch-size] [lr] [patience]
+# Usage: ./run_optimize.sh [architecture] [epochs] [patience] [n-trials]
 ARCHITECTURE=${1:-DenseNet121}
-K_FOLDS=${2:-3}
-EPOCHS=${3:-20}
-BATCH_SIZE=${4:-128}
-LR=${5:-0.001}
-PATIENCE=${6:-5}
+EPOCHS=${2:-20}
+PATIENCE=${3:-5}
+N_TRIALS=${4:-30}
 
 if ! command -v uv &> /dev/null; then
   curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -44,8 +42,6 @@ python optimize.py \
   --architecture "$ARCHITECTURE" \
   --device cuda \
   --cpu-workers 16 \
-  --k-folds "$K_FOLDS" \
   --epochs "$EPOCHS" \
-  --batch-size "$BATCH_SIZE" \
-  --lr "$LR" \
-  --patience "$PATIENCE"
+  --patience "$PATIENCE" \
+  --n-trials "$N_TRIALS"

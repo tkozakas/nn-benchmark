@@ -10,35 +10,35 @@ LOCAL_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Default values
 ARCHITECTURE="DenseNet121"
-K_FOLDS="3"
 EPOCHS="20"
-BATCH_SIZE="128"
-LR="0.001"
 PATIENCE="5"
+N_TRIALS="30"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
     --architecture) ARCHITECTURE="$2"; shift 2 ;;
-    --k-folds) K_FOLDS="$2"; shift 2 ;;
     --epochs) EPOCHS="$2"; shift 2 ;;
-    --batch-size) BATCH_SIZE="$2"; shift 2 ;;
-    --lr) LR="$2"; shift 2 ;;
     --patience) PATIENCE="$2"; shift 2 ;;
+    --n-trials) N_TRIALS="$2"; shift 2 ;;
     -h|--help)
       echo "Usage: ./hpc_optimize.sh [OPTIONS]"
       echo ""
-      echo "Runs optimization experiment comparing:"
-      echo "  - From scratch vs Pretrained"
-      echo "  - No augmentation vs Mixup vs CutMix"
+      echo "Runs Optuna hyperparameter optimization to find the best configuration."
+      echo ""
+      echo "Optimizes:"
+      echo "  - Pretrained vs from scratch"
+      echo "  - Augmentation: none, mixup, cutmix"
+      echo "  - Learning rate (1e-5 to 1e-2)"
+      echo "  - Batch size (64, 128, 256)"
+      echo "  - Weight decay (1e-6 to 1e-2)"
+      echo "  - Optimizer (adam, adamw, sgd)"
       echo ""
       echo "Options:"
       echo "  --architecture   Model architecture (default: DenseNet121)"
-      echo "  --k-folds        Number of folds (default: 3)"
-      echo "  --epochs         Number of epochs (default: 20)"
-      echo "  --batch-size     Batch size (default: 128)"
-      echo "  --lr             Learning rate (default: 0.001)"
+      echo "  --epochs         Epochs per trial (default: 20)"
       echo "  --patience       Early stopping patience (default: 5)"
+      echo "  --n-trials       Number of Optuna trials (default: 30)"
       exit 0
       ;;
     *) echo "Unknown option: $1"; exit 1 ;;
@@ -48,21 +48,19 @@ done
 SSH_CMD="ssh -i $SSH_KEY ${HPC_USER}@${HPC_HOST}"
 SCP_CMD="scp -i $SSH_KEY"
 
-echo "=== HPC Optimize Runner ==="
+echo "=== HPC Optuna Optimizer ==="
 echo "Architecture: $ARCHITECTURE"
-echo "K-Folds:      $K_FOLDS"
-echo "Epochs:       $EPOCHS"
-echo "Batch Size:   $BATCH_SIZE"
-echo "LR:           $LR"
+echo "Epochs/trial: $EPOCHS"
 echo "Patience:     $PATIENCE"
+echo "N trials:     $N_TRIALS"
 echo ""
-echo "Will compare 6 configurations:"
-echo "  1. ${ARCHITECTURE} from scratch"
-echo "  2. ${ARCHITECTURE} from scratch + Mixup"
-echo "  3. ${ARCHITECTURE} from scratch + CutMix"
-echo "  4. ${ARCHITECTURE} pretrained"
-echo "  5. ${ARCHITECTURE} pretrained + Mixup"
-echo "  6. ${ARCHITECTURE} pretrained + CutMix"
+echo "Will optimize:"
+echo "  - pretrained: [True, False]"
+echo "  - augmentation: [none, mixup, cutmix]"
+echo "  - lr: [1e-5, 1e-2]"
+echo "  - batch_size: [64, 128, 256]"
+echo "  - weight_decay: [1e-6, 1e-2]"
+echo "  - optimizer: [adam, adamw, sgd]"
 
 # Step 1: Sync local code to HPC
 echo ""
@@ -76,7 +74,7 @@ rsync -avz --exclude '.venv' --exclude '__pycache__' --exclude '*.pyc' \
 echo ""
 echo "=== Submitting job to HPC ==="
 JOBID=$($SSH_CMD "cd $REMOTE_DIR && mkdir -p logs && sbatch --parsable run_optimize.sh \
-  $ARCHITECTURE $K_FOLDS $EPOCHS $BATCH_SIZE $LR $PATIENCE")
+  $ARCHITECTURE $EPOCHS $PATIENCE $N_TRIALS")
 echo "Job submitted with ID: $JOBID"
 
 LOGFILE="logs/optimization_benchmark_${JOBID}.out"
@@ -121,9 +119,8 @@ $SCP_CMD "${HPC_USER}@${HPC_HOST}:${REMOTE_DIR}/${LOGFILE}" "$LOCAL_DIR/logs/" 2
 echo "Copying test_data..."
 $SCP_CMD -r "${HPC_USER}@${HPC_HOST}:${REMOTE_DIR}/test_data" "$LOCAL_DIR/" 2>/dev/null || echo "No test_data to copy"
 
-echo "Copying trained models..."
-$SCP_CMD -r "${HPC_USER}@${HPC_HOST}:${REMOTE_DIR}/trained" "$LOCAL_DIR/" 2>/dev/null || echo "No trained models to copy"
-
 echo ""
 echo "=== Done! ==="
 echo "Log file: $LOCAL_DIR/logs/optimization_benchmark_${JOBID}.out"
+echo "Results: $LOCAL_DIR/test_data/optuna_${ARCHITECTURE,,}.csv"
+echo "Best config: $LOCAL_DIR/test_data/optuna_${ARCHITECTURE,,}_best.csv"
