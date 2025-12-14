@@ -8,9 +8,13 @@
 #SBATCH --job-name=tinyimagenet_benchmark
 #SBATCH --output=logs/tinyimagenet_benchmark_%j.out
 
-# Usage: ./run_experiment.sh [experiment]
-# experiment options: learning-rate | optimizer | scheduler | batch-size | architecture | hpo | architecture-hpo | full
-EXPERIMENT=${1:-full}
+# Usage: ./run_experiment.sh [architecture] [k-folds] [epochs] [batch-size] [lr] [patience]
+ARCHITECTURE=${1:-ResNet50}
+K_FOLDS=${2:-3}
+EPOCHS=${3:-20}
+BATCH_SIZE=${4:-2048}
+LR=${5:-0.001}
+PATIENCE=${6:-5}
 
 # load UV Python & your venv
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -31,13 +35,12 @@ python -c "import torch; print(f'GPUs: {torch.cuda.device_count()}'); [print(f'G
 
 cd src
 python experiment.py \
-  --architecture ResNet50 \
+  --architecture "$ARCHITECTURE" \
   --device cuda \
   --cpu-workers 16 \
-  --k-folds 3 \
-  --epochs 20 \
-  --batch-size 2048 \
-  --lr 0.001 \
-  --patience 5 \
-  --subsample-size None \
-  --experiment "$EXPERIMENT"
+  --k-folds "$K_FOLDS" \
+  --epochs "$EPOCHS" \
+  --batch-size "$BATCH_SIZE" \
+  --lr "$LR" \
+  --patience "$PATIENCE" \
+  --subsample-size None

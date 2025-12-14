@@ -8,15 +8,49 @@ SSH_KEY="~/.ssh/id_ed25519"
 REMOTE_DIR="/scratch/lustre/home/${HPC_USER}/nn-benchmark"
 LOCAL_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Default values
+ARCHITECTURE="ResNet50"
+K_FOLDS="3"
+EPOCHS="20"
+BATCH_SIZE="2048"
+LR="0.001"
+PATIENCE="5"
+
 # Parse arguments
-EXPERIMENT="${1:-full}"
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --architecture) ARCHITECTURE="$2"; shift 2 ;;
+    --k-folds) K_FOLDS="$2"; shift 2 ;;
+    --epochs) EPOCHS="$2"; shift 2 ;;
+    --batch-size) BATCH_SIZE="$2"; shift 2 ;;
+    --lr) LR="$2"; shift 2 ;;
+    --patience) PATIENCE="$2"; shift 2 ;;
+    -h|--help)
+      echo "Usage: ./hpc_run.sh [OPTIONS]"
+      echo ""
+      echo "Options:"
+      echo "  --architecture   Initial architecture (default: ResNet50)"
+      echo "  --k-folds        Number of folds (default: 3)"
+      echo "  --epochs         Number of epochs (default: 20)"
+      echo "  --batch-size     Batch size (default: 2048)"
+      echo "  --lr             Initial learning rate (default: 0.001)"
+      echo "  --patience       Early stopping patience (default: 5)"
+      exit 0
+      ;;
+    *) echo "Unknown option: $1"; exit 1 ;;
+  esac
+done
 
 SSH_CMD="ssh -i $SSH_KEY ${HPC_USER}@${HPC_HOST}"
 SCP_CMD="scp -i $SSH_KEY"
 
 echo "=== HPC Runner ==="
-echo "Experiment: $EXPERIMENT"
-echo "Options: learning-rate | optimizer | scheduler | batch-size | architecture | hpo | architecture-hpo | full"
+echo "Architecture: $ARCHITECTURE"
+echo "K-Folds:      $K_FOLDS"
+echo "Epochs:       $EPOCHS"
+echo "Batch Size:   $BATCH_SIZE"
+echo "LR:           $LR"
+echo "Patience:     $PATIENCE"
 
 # Step 1: Sync local code to HPC
 echo ""
@@ -29,7 +63,8 @@ rsync -avz --exclude '.venv' --exclude '__pycache__' --exclude '*.pyc' \
 # Step 2: Submit job and get job ID
 echo ""
 echo "=== Submitting job to HPC ==="
-JOBID=$($SSH_CMD "cd $REMOTE_DIR && mkdir -p logs && sbatch --parsable run_experiment.sh $EXPERIMENT")
+JOBID=$($SSH_CMD "cd $REMOTE_DIR && mkdir -p logs && sbatch --parsable run_experiment.sh \
+  $ARCHITECTURE $K_FOLDS $EPOCHS $BATCH_SIZE $LR $PATIENCE")
 echo "Job submitted with ID: $JOBID"
 
 LOGFILE="logs/tinyimagenet_benchmark_${JOBID}.out"

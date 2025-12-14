@@ -8,7 +8,6 @@ Usage:
                   [--epochs=N]
                   [--batch-size=B]
                   [--lr=LR]
-                  [--weight-decay=WD]
                   [--patience=P]
 
 Options:
@@ -210,10 +209,10 @@ def main():
     # 2) Optimizer Comparison
     print("Running optimizer comparison...")
     optim_map = {
-        'Adam': lambda p: torch.optim.Adam(p, lr=LR, weight_decay=WD),
-        'AdamW': lambda p: torch.optim.AdamW(p, lr=LR, weight_decay=WD),
-        'SGD': lambda p: torch.optim.SGD(p, lr=LR, momentum=0.9, weight_decay=WD),
-        'RMSprop': lambda p: torch.optim.RMSprop(p, lr=LR, weight_decay=WD)
+        'Adam': lambda p: torch.optim.Adam(p, lr=LR),
+        'AdamW': lambda p: torch.optim.AdamW(p, lr=LR),
+        'SGD': lambda p: torch.optim.SGD(p, lr=LR, momentum=0.9),
+        'RMSprop': lambda p: torch.optim.RMSprop(p, lr=LR)
     }
     runs = [
         run_experiment(
@@ -361,7 +360,7 @@ def main():
 
     print("Best configuration summary → "
           f"Architecture: {best_run['name']}, Optimizer: {best_opt}, Scheduler: {best_sched}, "
-          f"Weight Decay: {best_reg}, Batch Size: {best_bs}, LR: {LR}, Epochs: {N}, Patience: {PAT}, Subsample: {SUBSAMPLE_SIZE}")
+          f"Batch Size: {best_bs}, LR: {LR}, Epochs: {N}, Patience: {PAT}, Subsample: {SUBSAMPLE_SIZE}")
 
 
 if __name__ == "__main__":

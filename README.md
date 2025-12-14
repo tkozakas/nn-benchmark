@@ -53,7 +53,6 @@ python experiment.py \
   --epochs 10 \
   --batch-size 128 \
   --lr 0.001 \
-  --weight-decay 0.0001 \
   --patience 5
 ```
 Supported architectures are declared in `config.py` (default: GoogleNet, ResNet18, ResNet50, DenseNet121). Extend that
@@ -78,10 +77,23 @@ mapping to add more.
 ### Run Experiment
 Run experiments from your local machine (syncs code, submits job, streams logs, copies results back):
 ```bash
-./hpc_run.sh <experiment>
+./hpc_run.sh [OPTIONS]
 ```
 
-Options: `learning-rate` | `optimizer` | `scheduler` | `batch-size` | `architecture` | `hpo` | `architecture-hpo` | `full`
+**Options:**
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--architecture` | `ResNet50` | Initial architecture |
+| `--k-folds` | `3` | Number of CV folds |
+| `--epochs` | `20` | Number of epochs |
+| `--batch-size` | `2048` | Batch size |
+| `--lr` | `0.001` | Initial learning rate |
+| `--patience` | `5` | Early stopping patience |
+
+**Example:**
+```bash
+./hpc_run.sh --architecture ResNet18 --epochs 10 --batch-size 512
+```
 
 ### Cancel Jobs
 ```bash
