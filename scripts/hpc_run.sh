@@ -2,65 +2,68 @@
 set -e
 
 # Configuration
-HPC_USER="toko7940"
 HPC_HOST="hpc.mif.vu.lt"
 SSH_KEY="~/.ssh/id_ed25519"
-REMOTE_DIR="/scratch/lustre/home/${HPC_USER}/nn-benchmark"
-LOCAL_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LOCAL_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Default values
-ARCHITECTURE="DenseNet121"
+HPC_USER=""
+ARCHITECTURE="ResNet50"
+K_FOLDS="3"
 EPOCHS="20"
+BATCH_SIZE="2048"
+LR="0.001"
 PATIENCE="5"
-N_TRIALS="30"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --user) HPC_USER="$2"; shift 2 ;;
     --architecture) ARCHITECTURE="$2"; shift 2 ;;
+    --k-folds) K_FOLDS="$2"; shift 2 ;;
     --epochs) EPOCHS="$2"; shift 2 ;;
+    --batch-size) BATCH_SIZE="$2"; shift 2 ;;
+    --lr) LR="$2"; shift 2 ;;
     --patience) PATIENCE="$2"; shift 2 ;;
-    --n-trials) N_TRIALS="$2"; shift 2 ;;
     -h|--help)
-      echo "Usage: ./hpc_optimize.sh [OPTIONS]"
+      echo "Usage: ./hpc_run.sh --user USERNAME [OPTIONS]"
       echo ""
-      echo "Runs Optuna hyperparameter optimization to find the best configuration."
-      echo ""
-      echo "Optimizes:"
-      echo "  - Pretrained vs from scratch"
-      echo "  - Augmentation: none, mixup, cutmix"
-      echo "  - Learning rate (1e-5 to 1e-2)"
-      echo "  - Batch size (64, 128, 256)"
-      echo "  - Weight decay (1e-6 to 1e-2)"
-      echo "  - Optimizer (adam, adamw, sgd)"
+      echo "Required:"
+      echo "  --user           HPC username (required)"
       echo ""
       echo "Options:"
-      echo "  --architecture   Model architecture (default: DenseNet121)"
-      echo "  --epochs         Epochs per trial (default: 20)"
+      echo "  --architecture   Initial architecture (default: ResNet50)"
+      echo "  --k-folds        Number of folds (default: 3)"
+      echo "  --epochs         Number of epochs (default: 20)"
+      echo "  --batch-size     Batch size (default: 2048)"
+      echo "  --lr             Initial learning rate (default: 0.001)"
       echo "  --patience       Early stopping patience (default: 5)"
-      echo "  --n-trials       Number of Optuna trials (default: 30)"
       exit 0
       ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
 
+if [[ -z "$HPC_USER" ]]; then
+  echo "Error: --user is required"
+  echo "Usage: ./hpc_run.sh --user USERNAME [OPTIONS]"
+  exit 1
+fi
+
+REMOTE_DIR="/scratch/lustre/home/${HPC_USER}/nn-benchmark"
+
 SSH_CMD="ssh -i $SSH_KEY ${HPC_USER}@${HPC_HOST}"
 SCP_CMD="scp -i $SSH_KEY"
 
-echo "=== HPC Optuna Optimizer ==="
+echo "=== HPC Runner ==="
+echo "User:         $HPC_USER"
 echo "Architecture: $ARCHITECTURE"
-echo "Epochs/trial: $EPOCHS"
+echo "K-Folds:      $K_FOLDS"
+echo "Epochs:       $EPOCHS"
+echo "Batch Size:   $BATCH_SIZE"
+echo "LR:           $LR"
 echo "Patience:     $PATIENCE"
-echo "N trials:     $N_TRIALS"
-echo ""
-echo "Will optimize:"
-echo "  - pretrained: [True, False]"
-echo "  - augmentation: [none, mixup, cutmix]"
-echo "  - lr: [1e-5, 1e-2]"
-echo "  - batch_size: [64, 128, 256]"
-echo "  - weight_decay: [1e-6, 1e-2]"
-echo "  - optimizer: [adam, adamw, sgd]"
 
 # Step 1: Sync local code to HPC
 echo ""
@@ -73,11 +76,11 @@ rsync -avz --exclude '.venv' --exclude '__pycache__' --exclude '*.pyc' \
 # Step 2: Submit job and get job ID
 echo ""
 echo "=== Submitting job to HPC ==="
-JOBID=$($SSH_CMD "cd $REMOTE_DIR && mkdir -p logs && sbatch --parsable run_optimize.sh \
-  $ARCHITECTURE $EPOCHS $PATIENCE $N_TRIALS")
+JOBID=$($SSH_CMD "cd $REMOTE_DIR && mkdir -p logs && sbatch --parsable scripts/run_experiment.sh \
+  $ARCHITECTURE $K_FOLDS $EPOCHS $BATCH_SIZE $LR $PATIENCE")
 echo "Job submitted with ID: $JOBID"
 
-LOGFILE="logs/optimization_benchmark_${JOBID}.out"
+LOGFILE="logs/experiment_${JOBID}.out"
 
 # Step 3: Wait for log file to appear and stream it
 echo ""
@@ -119,8 +122,9 @@ $SCP_CMD "${HPC_USER}@${HPC_HOST}:${REMOTE_DIR}/${LOGFILE}" "$LOCAL_DIR/logs/" 2
 echo "Copying test_data..."
 $SCP_CMD -r "${HPC_USER}@${HPC_HOST}:${REMOTE_DIR}/test_data" "$LOCAL_DIR/" 2>/dev/null || echo "No test_data to copy"
 
+echo "Copying trained models..."
+$SCP_CMD -r "${HPC_USER}@${HPC_HOST}:${REMOTE_DIR}/trained" "$LOCAL_DIR/" 2>/dev/null || echo "No trained models to copy"
+
 echo ""
 echo "=== Done! ==="
-echo "Log file: $LOCAL_DIR/logs/optimization_benchmark_${JOBID}.out"
-echo "Results: $LOCAL_DIR/test_data/optuna_${ARCHITECTURE,,}.csv"
-echo "Best config: $LOCAL_DIR/test_data/optuna_${ARCHITECTURE,,}_best.csv"
+echo "Log file: $LOCAL_DIR/logs/experiment_${JOBID}.out"

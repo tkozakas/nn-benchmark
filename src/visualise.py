@@ -45,8 +45,8 @@ def _save_csv_bar(labels, values, category, suffix):
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["label", "value"])
-        for l, v in zip(labels, values):
-            writer.writerow([l, v])
+        for label, val in zip(labels, values):
+            writer.writerow([label, val])
 
 
 def _plot_line(runs, key, title, xlabel, ylabel, category, suffix):
@@ -105,8 +105,8 @@ def _plot_scatter(labels, xs, ys,
                   category, suffix):
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.scatter(xs, ys)
-    for l, x, y in zip(labels, xs, ys):
-        ax.text(x, y, l, fontsize=8, ha='right')
+    for label, x, y in zip(labels, xs, ys):
+        ax.text(x, y, label, fontsize=8, ha='right')
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -118,8 +118,8 @@ def _plot_scatter(labels, xs, ys,
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["label", "x", "y"])
-        for l, x, y in zip(labels, xs, ys):
-            writer.writerow([l, x, y])
+        for label, x, y in zip(labels, xs, ys):
+            writer.writerow([label, x, y])
 
 
 def plot_learning_rate_comparison(runs, name):

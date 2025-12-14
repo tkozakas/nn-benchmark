@@ -3,21 +3,15 @@ from pathlib import Path
 import torch
 from torch import nn
 
-from config import supported_architectures
+from config import SUPPORTED_ARCHITECTURES
 
 
 def get_model(architecture, num_classes, pretrained=True):
-    """Return a torchvision model instance for the given architecture.
-    Supported architectures are defined in config.supported_architectures.
-
-    Args:
-        architecture: Model architecture name
-        num_classes: Number of output classes
-        pretrained: If True, loads ImageNet pretrained weights (default: True)
-    """
+    """Return a torchvision model with optional ImageNet pretrained weights."""
     arch = architecture.lower()
-    if architecture not in supported_architectures:
-        raise ValueError(f"Unsupported architecture '{architecture}'. Choose one of: {list(supported_architectures.keys())}")
+    if architecture not in SUPPORTED_ARCHITECTURES:
+        raise ValueError(f"Unsupported architecture '{architecture}'. "
+                         f"Choose from: {list(SUPPORTED_ARCHITECTURES.keys())}")
 
     if arch == 'googlenet':
         from torchvision.models import googlenet, GoogLeNet_Weights

@@ -20,12 +20,15 @@ The pipeline automates comparative experiments for:
 - Python: 3.12
 
 If using an AMD GPU that requires an override (example shown for some RDNA2 cards):
+
 ```bash
 export HSA_OVERRIDE_GFX_VERSION=10.3.0
 ```
 
 ## Installation
+
 ### Install [uv](https://github.com/astral-sh/uv)
+
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
@@ -33,7 +36,9 @@ uv python install 3.12
 uv venv --python 3.12
 source .venv/bin/activate
 ```
+
 ### Install dependencies
+
 ```bash
 uv pip install -r requirements.txt
 uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.2
@@ -42,7 +47,9 @@ uv pip install torch torchvision torchaudio --index-url https://download.pytorch
 ```
 
 ## Quick Experiment Run
+
 Example: run the full comparison pipeline starting from ResNet18.
+
 ```bash
 cd src
 python experiment.py \
@@ -55,12 +62,14 @@ python experiment.py \
   --lr 0.001 \
   --patience 5
 ```
+
 Supported architectures are declared in `config.py` (default: GoogleNet, ResNet18, ResNet50, DenseNet121). Extend that
 mapping to add more.
 
 ## Run on VU HPC
 
 ### Setup SSH Key
+
 1. Generate an SSH key (if you haven't already):
    ```bash
    ssh-keygen -t ed25519
@@ -75,14 +84,17 @@ mapping to add more.
    ```
 
 ### Run Experiment
+
 Run experiments from your local machine (syncs code, submits job, streams logs, copies results back):
+
 ```bash
-./hpc_run.sh [OPTIONS]
+./scripts/hpc_run.sh --user USERNAME [OPTIONS]
 ```
 
 **Options:**
 | Option | Default | Description |
 |--------|---------|-------------|
+| `--user` | (required) | HPC username |
 | `--architecture` | `ResNet50` | Initial architecture |
 | `--k-folds` | `3` | Number of CV folds |
 | `--epochs` | `20` | Number of epochs |
@@ -91,25 +103,30 @@ Run experiments from your local machine (syncs code, submits job, streams logs, 
 | `--patience` | `5` | Early stopping patience |
 
 **Example:**
+
 ```bash
-./hpc_run.sh --architecture ResNet18 --epochs 10 --batch-size 512
+./scripts/hpc_run.sh --user myusername --architecture ResNet18 --epochs 10 --batch-size 512
 ```
 
 ### Run Optuna Optimization
+
 Use Optuna to find the best hyperparameters for a given architecture:
+
 ```bash
-./hpc_optimize.sh [OPTIONS]
+./scripts/hpc_optimize.sh --user USERNAME [OPTIONS]
 ```
 
 **Options:**
 | Option | Default | Description |
 |--------|---------|-------------|
+| `--user` | (required) | HPC username |
 | `--architecture` | `DenseNet121` | Model architecture |
 | `--epochs` | `20` | Epochs per trial |
 | `--patience` | `5` | Early stopping patience |
 | `--n-trials` | `30` | Number of Optuna trials |
 
 **Optimizes:**
+
 - `pretrained`: True / False
 - `augmentation`: none / mixup / cutmix
 - `lr`: 1e-5 to 1e-2 (log scale)
@@ -118,20 +135,22 @@ Use Optuna to find the best hyperparameters for a given architecture:
 - `optimizer`: adam, adamw, sgd
 
 **Example:**
+
 ```bash
 # Quick test (5 trials, 10 epochs)
-./hpc_optimize.sh --architecture DenseNet121 --epochs 10 --n-trials 5
+./scripts/hpc_optimize.sh --user myusername --architecture DenseNet121 --epochs 10 --n-trials 5
 
 # Full optimization
-./hpc_optimize.sh --architecture DenseNet121 --epochs 20 --n-trials 50
+./scripts/hpc_optimize.sh --user myusername --architecture DenseNet121 --epochs 20 --n-trials 50
 ```
 
 **Output:**
+
 - `test_data/optuna_<arch>.csv` - All trial results
 - `test_data/optuna_<arch>_best.csv` - Best configuration with 3-fold CV results
 
 ### Cancel Jobs
+
 ```bash
 ssh -i ~/.ssh/id_ed25519 $HPC_USER@hpc.mif.vu.lt "scancel -u $HPC_USER"
 ```
-

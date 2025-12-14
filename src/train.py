@@ -1,3 +1,5 @@
+"""Training loop and utilities."""
+
 __doc__ = r"""
 Usage:
     train.py [--architecture=ARCH]
@@ -24,31 +26,26 @@ Options:
     --patience=P            Early-stop patience [default: 5].
 """
 
-import os
 import re
 import subprocess
 import time
 import warnings
 
-import kagglehub
 import psutil
 import torch
-from pathlib import Path
 from docopt import docopt
 from sklearn.exceptions import UndefinedMetricWarning
-from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score
 from sklearn.model_selection import KFold
 from torch import nn, optim
 from torch.backends import cudnn
-from torch.utils.data import DataLoader, Subset
-from torchvision import datasets
+from torch.utils.data import DataLoader
 
-from config import train_config
+from config import VAL_SPLIT, RANDOM_STATE
+from data import load_dataset, get_subsample, create_fold_loaders, get_transforms
+from metrics import evaluate, compute_inference_latency
 from model import get_model, save_model, load_model
-from utility import get_transforms, parse_args, get_subsample
-from visualise import (
-    plot_confusion_matrix
-)
+from utility import parse_args
+from visualise import plot_confusion_matrix
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 warnings.filterwarnings("ignore", message=".*hipBLASLt.*", category=UserWarning)
@@ -56,7 +53,6 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="docopt")
 cudnn.benchmark = True
 
-transform = get_transforms()
 
 def get_gpu_usage_percent():
     """Return GPU utilization percent for NVIDIA or AMD/ROCm."""
@@ -82,62 +78,12 @@ def get_gpu_usage_percent():
     return 0.0
 
 
-def evaluate_and_metrics(model, loader, criterion, device):
-    """Run evaluation and compute loss, accuracy and confusion‐based metrics."""
-    model.eval()
-    running_loss = correct = total = 0
-    y_true, y_pred = [], []
-    with torch.no_grad():
-        for imgs, labels in loader:
-            imgs = imgs.to(device, non_blocking=True)
-            labels = labels.to(device, non_blocking=True)
-            outputs = model(imgs)
-            loss = criterion(outputs, labels)
-            running_loss += loss.item() * imgs.size(0)
-            preds = outputs.argmax(dim=1)
-            correct += (preds == labels).sum().item()
-            total += labels.size(0)
-            y_true.extend(labels.cpu().numpy())
-            y_pred.extend(preds.cpu().numpy())
-    loss = running_loss / total
-    acc = correct / total
-    cm = confusion_matrix(y_true, y_pred)
-    tp = int(cm.diagonal().sum())
-    fp = int(cm.sum(axis=0).sum() - tp)
-    prec = precision_score(y_true, y_pred, average='macro', zero_division=0)
-    rec = recall_score(y_true, y_pred, average='macro', zero_division=0)
-    f1 = f1_score(y_true, y_pred, average='macro', zero_division=0)
-    return loss, acc, tp, fp, prec, rec, f1
-
-
-def get_data_loaders(dataset, train_idx, test_idx,
-                     batch_size, num_workers):
-    """Split dataset into train/val/test and return DataLoaders."""
-    train_subset = Subset(dataset, train_idx)
-    test_subset = Subset(dataset, test_idx)
-    val_size = int(len(train_subset) * train_config["val_split"])
-    train_size = len(train_subset) - val_size
-    train_data, val_data = torch.utils.data.random_split(
-        train_subset, [train_size, val_size]
-    )
-    loader_args = dict(
-        batch_size=batch_size,
-        pin_memory=torch.cuda.is_available(),
-        persistent_workers=False,
-        num_workers=num_workers,
-        prefetch_factor=2
-    )
-    train_loader = DataLoader(train_data, shuffle=True, **loader_args)
-    val_loader = DataLoader(val_data, shuffle=False, **loader_args)
-    test_loader = DataLoader(test_subset, shuffle=False, **loader_args)
-    return train_loader, val_loader, test_loader
-
-
 def train_one_epoch(model, loader, criterion, optimizer, device):
     """Train model for one epoch, returning loss, acc, peak CPU/GPU usage."""
     model.train()
     running_loss = correct = total = 0
     max_cpu = max_gpu = 0.0
+
     for imgs, labels in loader:
         imgs = imgs.to(device, non_blocking=True)
         labels = labels.to(device, non_blocking=True)
@@ -146,26 +92,26 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
-        # resource sampling
+
+        # Resource sampling
         cpu = psutil.cpu_percent(interval=None)
         gpu = get_gpu_usage_percent()
         max_cpu = max(max_cpu, cpu)
         max_gpu = max(max_gpu, gpu)
+
         running_loss += loss.item() * imgs.size(0)
         preds = outputs.argmax(dim=1)
         correct += (preds == labels).sum().item()
         total += labels.size(0)
+
     return running_loss / total, correct / total, max_cpu, max_gpu
 
 
-def init_model_optimizer_scheduler(model_fn, learning_rate,
-                                   weight_decay,
-                                   optimizer_fn, scheduler_fn,
-                                   device):
+def init_model_optimizer_scheduler(model_fn, learning_rate, weight_decay,
+                                   optimizer_fn, scheduler_fn, device):
     """Instantiate model, optimizer, and scheduler."""
     model = model_fn().to(device)
 
-    # Multi-GPU support: use DataParallel if multiple GPUs available
     if torch.cuda.is_available() and torch.cuda.device_count() > 1:
         print(f"[INFO] Using {torch.cuda.device_count()} GPUs with DataParallel")
         model = nn.DataParallel(model)
@@ -177,34 +123,20 @@ def init_model_optimizer_scheduler(model_fn, learning_rate,
     return model, optimizer, scheduler
 
 
-def train(architecture,
-          dataset,
-          model_fn,
-          k_folds=None,
-          epochs=10,
-          batch_size=128,
-          learning_rate=1e-3,
-          weight_decay=1e-4,
-          optimizer_fn=None,
-          scheduler_fn=None,
-          criterion=None,
-          early_stopping_patience=None,
-          device='cuda',
-          cpu_workers=4,
-          random_state=42):
+def train(architecture, dataset, model_fn, k_folds=None, epochs=10, batch_size=128,
+          learning_rate=1e-3, weight_decay=1e-4, optimizer_fn=None, scheduler_fn=None,
+          criterion=None, early_stopping_patience=None, device='cuda', cpu_workers=4,
+          random_state=RANDOM_STATE):
+    """Train model with optional k-fold cross-validation."""
     device = torch.device(device)
     criterion = criterion or nn.CrossEntropyLoss()
 
     if k_folds is None:
-        val_frac = train_config["val_split"]
         n = len(dataset)
-        n_val = int(n * val_frac)
+        n_val = int(n * VAL_SPLIT)
         n_train = n - n_val
-
-        # reproducible split
         train_subset, val_subset = torch.utils.data.random_split(
-            dataset,
-            [n_train, n_val],
+            dataset, [n_train, n_val],
             generator=torch.Generator().manual_seed(random_state)
         )
         folds = [(train_subset.indices, val_subset.indices)]
@@ -216,26 +148,19 @@ def train(architecture,
     total_start = time.time()
 
     for fold_idx, (train_idx, test_idx) in enumerate(folds, start=1):
-        # DataLoaders
         num_train_samples = len(train_idx)
-        train_loader, val_loader, test_loader = get_data_loaders(
-            dataset, train_idx, test_idx,
-            batch_size, cpu_workers
+        train_loader, val_loader, test_loader = create_fold_loaders(
+            dataset, train_idx, test_idx, batch_size, cpu_workers
         )
 
-        # Init model/optimizer/scheduler
         model, optimizer, scheduler = init_model_optimizer_scheduler(
-            model_fn, learning_rate, weight_decay,
-            optimizer_fn, scheduler_fn, device
+            model_fn, learning_rate, weight_decay, optimizer_fn, scheduler_fn, device
         )
 
-        # count params once
         param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
-
         best_val_loss = float('inf')
         patience_cnt = 0
 
-        # history per epoch
         history = {
             'train_loss': [], 'train_accuracy': [],
             'val_loss': [], 'val_accuracy': [],
@@ -245,7 +170,6 @@ def train(architecture,
             'samples_per_sec': []
         }
 
-        # --- training loop ---
         for epoch in range(1, epochs + 1):
             t0 = time.time()
             tloss, tacc, cpu_peak, gpu_peak = train_one_epoch(
@@ -253,14 +177,9 @@ def train(architecture,
             )
             epoch_duration = time.time() - t0
 
-            vloss, vacc, tp, fp, prec, rec, f1 = evaluate_and_metrics(
-                model, val_loader, criterion, device
-            )
-
-            # Throughput = samples / second
+            vloss, vacc, prec, rec, f1 = evaluate(model, val_loader, criterion, device)
             throughput = num_train_samples / epoch_duration
 
-            # record
             history['train_loss'].append(tloss)
             history['train_accuracy'].append(tacc)
             history['val_loss'].append(vloss)
@@ -274,9 +193,9 @@ def train(architecture,
             history['cpu_usage'].append(cpu_peak)
             history['gpu_usage'].append(gpu_peak)
 
-            # step & early stop
             if scheduler:
                 scheduler.step()
+
             if early_stopping_patience is not None:
                 if vloss < best_val_loss:
                     best_val_loss, patience_cnt = vloss, 0
@@ -292,26 +211,12 @@ def train(architecture,
                   f"F1: {f1:.3f} | CPU: {cpu_peak:.1f}% | GPU: {gpu_peak:.1f}% | "
                   f"Time: {epoch_duration:.2f}s")
 
-        # --- after training, evaluate on test set ---
-        tloss, tacc, tp, fp, prec, rec, f1 = evaluate_and_metrics(
-            model, test_loader, criterion, device
-        )
+        # Evaluate on test set
+        tloss, tacc, prec, rec, f1 = evaluate(model, test_loader, criterion, device)
         print(f"Test | Loss: {tloss:.3f} | Acc: {tacc:.3f} | "
               f"Prec: {prec:.3f} | Rec: {rec:.3f} | F1: {f1:.3f}")
 
-        # inference latency
-        model.eval()
-        dummy = next(iter(test_loader))[0].to(device)
-        with torch.no_grad():
-            for _ in range(5):
-                _ = model(dummy)
-        start_inf = time.time()
-        total_samples = 0
-        with torch.no_grad():
-            for xb, _ in test_loader:
-                total_samples += xb.size(0)
-                _ = model(xb.to(device))
-        inf_latency = (time.time() - start_inf) / total_samples
+        inf_latency = compute_inference_latency(model, test_loader, device)
 
         history.update({
             'test_loss': tloss,
@@ -335,68 +240,49 @@ def train(architecture,
 
 def main():
     print("Starting training...")
-    ARCHITECTURE, B, CPU_WORKERS, DEVICE, K, LR, N, PAT, SUBSAMPLE_SIZE = parse_args(docopt(__doc__))
+    args = parse_args(docopt(__doc__))
+    architecture, batch_size, cpu_workers, device, k_folds, lr, epochs, patience, subsample_size = args
 
-    project_root = Path(__file__).parent.parent.resolve()
-    local_base = project_root / 'dataset'
-    if os.path.isdir(local_base):
-        path = local_base
-        print("Using existing dataset cache:", path)
-    else:
-        path = kagglehub.dataset_download("akash2sharma/tiny-imagenet")
-        print("Downloaded dataset to:", path)
-
-    full = datasets.ImageFolder(
-        root=os.path.join(path, 'tiny-imagenet-200', 'train'),
-        transform=transform
-    )
-    ds = get_subsample(full, SUBSAMPLE_SIZE)
-
+    transform = get_transforms()
+    full = load_dataset(transform)
+    ds = get_subsample(full, subsample_size)
     num_classes = len(full.classes)
 
-    # train + CV
     results = train(
-        device=DEVICE,
-        architecture=ARCHITECTURE,
+        device=device,
+        architecture=architecture,
         dataset=ds,
-        model_fn=lambda: get_model(ARCHITECTURE, num_classes=num_classes),
-        k_folds=K,
-        epochs=N,
-        batch_size=B,
-        learning_rate=LR,
-        early_stopping_patience=PAT,
-        cpu_workers=CPU_WORKERS,
+        model_fn=lambda: get_model(architecture, num_classes=num_classes),
+        k_folds=k_folds,
+        epochs=epochs,
+        batch_size=batch_size,
+        learning_rate=lr,
+        early_stopping_patience=patience,
+        cpu_workers=cpu_workers,
         optimizer_fn=optim.Adam,
         scheduler_fn=None,
     )
 
-    # final confusion + test metrics (using last fold model)
+    # Final confusion matrix
     fold_to_load = results[-1]['fold']
     test_loader = DataLoader(
-        ds,
-        batch_size=B,
-        num_workers=CPU_WORKERS,
-        shuffle=False,
-        pin_memory=torch.cuda.is_available(),
+        ds, batch_size=batch_size, num_workers=cpu_workers,
+        shuffle=False, pin_memory=torch.cuda.is_available(),
         persistent_workers=False
     )
-    model = get_model(ARCHITECTURE, num_classes=num_classes).to(DEVICE)
-    model = load_model(
-        model, f"{ARCHITECTURE}_fold{fold_to_load}.pth"
-    )
-    plot_confusion_matrix(
-        model, test_loader, DEVICE,
-        classes=list(range(num_classes))
-    )
-    test_loss, test_acc, tp, fp, precision, sensitivity, f1_score_val = evaluate_and_metrics(
-        model, test_loader, nn.CrossEntropyLoss(), DEVICE
+    model = get_model(architecture, num_classes=num_classes).to(device)
+    model = load_model(model, f"{architecture}_fold{fold_to_load}.pth")
+    plot_confusion_matrix(model, test_loader, device, classes=list(range(num_classes)))
+
+    test_loss, test_acc, precision, recall, f1_val = evaluate(
+        model, test_loader, nn.CrossEntropyLoss(), device
     )
     print("\nTest results:")
     print(f"Test Loss: {test_loss:.4f}")
     print(f"Test Accuracy: {test_acc:.4f}")
     print(f"Precision: {precision:.4f}")
-    print(f"Sensitivity: {sensitivity:.4f}")
-    print(f"F1 Score: {f1_score_val:.4f}")
+    print(f"Recall: {recall:.4f}")
+    print(f"F1 Score: {f1_val:.4f}")
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@
 #SBATCH --mem=64G
 #SBATCH --time=24:00:00
 #SBATCH --job-name=tinyimagenet_benchmark
-#SBATCH --output=logs/tinyimagenet_benchmark_%j.out
+#SBATCH --output=logs/experiment_%j.out
 
 # Usage: ./run_experiment.sh [architecture] [k-folds] [epochs] [batch-size] [lr] [patience]
 ARCHITECTURE=${1:-ResNet50}
@@ -39,8 +39,7 @@ export OMP_NUM_THREADS=16
 
 python -c "import torch; print(f'GPUs: {torch.cuda.device_count()}'); [print(f'GPU {i}: {torch.cuda.get_device_name(i)}') for i in range(torch.cuda.device_count())]"
 
-cd src
-python experiment.py \
+python src/experiment.py \
   --architecture "$ARCHITECTURE" \
   --device cuda \
   --cpu-workers 16 \
