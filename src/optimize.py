@@ -44,7 +44,6 @@ warnings.filterwarnings("ignore", category=SyntaxWarning, module="docopt")
 
 
 def train_one_epoch(model, loader, criterion, optimizer, device, augment_fn=None):
-    """Train model for one epoch with optional Mixup/CutMix augmentation."""
     model.train()
     running_loss = correct = total = 0
 
@@ -79,7 +78,7 @@ def train_single_fold(architecture, dataset, train_idx, val_idx, pretrained=True
                       augment_fn=None, epochs=20, batch_size=128, learning_rate=1e-3,
                       weight_decay=1e-4, optimizer_name='adam', early_stopping_patience=5,
                       device='cuda', cpu_workers=4, verbose=True):
-    """Train model on a single fold and return validation F1."""
+    """Train on one fold and return best validation F1 score."""
     device = torch.device(device)
     criterion = nn.CrossEntropyLoss()
     n_classes = get_num_classes(dataset)
@@ -93,7 +92,6 @@ def train_single_fold(architecture, dataset, train_idx, val_idx, pretrained=True
     if torch.cuda.is_available() and torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)
 
-    # Select optimizer
     if optimizer_name == 'adam':
         opt = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     elif optimizer_name == 'adamw':
@@ -131,7 +129,7 @@ def train_single_fold(architecture, dataset, train_idx, val_idx, pretrained=True
 
 
 def create_objective(architecture, dataset, epochs, patience, cpu_workers, device):
-    """Create Optuna objective function."""
+    """Create Optuna objective with fixed train/val split for fair comparison."""
     n = len(dataset)
     n_val = int(n * 0.2)
     n_train = n - n_val
@@ -174,7 +172,7 @@ def create_objective(architecture, dataset, epochs, patience, cpu_workers, devic
 
 
 def run_final_evaluation(architecture, dataset, best_params, epochs, patience, cpu_workers, device):
-    """Run final evaluation with best parameters using 3-fold CV."""
+    """Run 3-fold CV with best params for reliable performance estimate."""
     print("\n=== Final Evaluation with Best Parameters (3-fold CV) ===")
     print(f"Best params: {best_params}")
 

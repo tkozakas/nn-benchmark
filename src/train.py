@@ -51,11 +51,12 @@ warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 warnings.filterwarnings("ignore", message=".*hipBLASLt.*", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="docopt")
+
 cudnn.benchmark = True
 
 
 def get_gpu_usage_percent():
-    """Return GPU utilization percent for NVIDIA or AMD/ROCm."""
+    """Try NVIDIA (pynvml), then AMD (rocm-smi). Returns 0 if unavailable."""
     try:
         import pynvml
         pynvml.nvmlInit()
@@ -65,6 +66,7 @@ def get_gpu_usage_percent():
         return float(util)
     except Exception:
         pass
+
     try:
         out = subprocess.check_output(
             ["rocm-smi", "--showuse"], stderr=subprocess.DEVNULL, text=True
@@ -75,11 +77,12 @@ def get_gpu_usage_percent():
                 return float(m.group(1))
     except Exception:
         pass
+
     return 0.0
 
 
 def train_one_epoch(model, loader, criterion, optimizer, device):
-    """Train model for one epoch, returning loss, acc, peak CPU/GPU usage."""
+    """Return (loss, accuracy, peak_cpu_usage, peak_gpu_usage)."""
     model.train()
     running_loss = correct = total = 0
     max_cpu = max_gpu = 0.0
@@ -87,13 +90,13 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
     for imgs, labels in loader:
         imgs = imgs.to(device, non_blocking=True)
         labels = labels.to(device, non_blocking=True)
+
         optimizer.zero_grad()
         outputs = model(imgs)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
 
-        # Resource sampling
         cpu = psutil.cpu_percent(interval=None)
         gpu = get_gpu_usage_percent()
         max_cpu = max(max_cpu, cpu)
@@ -109,7 +112,6 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
 
 def init_model_optimizer_scheduler(model_fn, learning_rate, weight_decay,
                                    optimizer_fn, scheduler_fn, device):
-    """Instantiate model, optimizer, and scheduler."""
     model = model_fn().to(device)
 
     if torch.cuda.is_available() and torch.cuda.device_count() > 1:
@@ -120,6 +122,7 @@ def init_model_optimizer_scheduler(model_fn, learning_rate, weight_decay,
         model.parameters(), lr=learning_rate, weight_decay=weight_decay
     )
     scheduler = scheduler_fn(optimizer) if scheduler_fn else None
+
     return model, optimizer, scheduler
 
 
@@ -127,7 +130,7 @@ def train(architecture, dataset, model_fn, k_folds=None, epochs=10, batch_size=1
           learning_rate=1e-3, weight_decay=1e-4, optimizer_fn=None, scheduler_fn=None,
           criterion=None, early_stopping_patience=None, device='cuda', cpu_workers=4,
           random_state=RANDOM_STATE):
-    """Train model with optional k-fold cross-validation."""
+    """Train with optional k-fold CV. Returns list of fold results."""
     device = torch.device(device)
     criterion = criterion or nn.CrossEntropyLoss()
 
@@ -211,7 +214,6 @@ def train(architecture, dataset, model_fn, k_folds=None, epochs=10, batch_size=1
                   f"F1: {f1:.3f} | CPU: {cpu_peak:.1f}% | GPU: {gpu_peak:.1f}% | "
                   f"Time: {epoch_duration:.2f}s")
 
-        # Evaluate on test set
         tloss, tacc, prec, rec, f1 = evaluate(model, test_loader, criterion, device)
         print(f"Test | Loss: {tloss:.3f} | Acc: {tacc:.3f} | "
               f"Prec: {prec:.3f} | Rec: {rec:.3f} | F1: {f1:.3f}")
@@ -263,11 +265,10 @@ def main():
         scheduler_fn=None,
     )
 
-    # Final confusion matrix
     fold_to_load = results[-1]['fold']
     test_loader = DataLoader(
         ds, batch_size=batch_size, num_workers=cpu_workers,
-        shuffle=False, pin_memory=torch.cuda.is_available(),
+        shuffle=False, pin_memory=bool(torch.cuda.is_available()),
         persistent_workers=False
     )
     model = get_model(architecture, num_classes=num_classes).to(device)

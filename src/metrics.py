@@ -5,7 +5,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score
 
 
 def evaluate(model, loader, criterion, device):
-    """Run evaluation and compute loss, accuracy and metrics."""
+    """Return loss, accuracy, precision, recall, f1."""
     model.eval()
     running_loss = 0
     correct = 0
@@ -16,12 +16,15 @@ def evaluate(model, loader, criterion, device):
         for imgs, labels in loader:
             imgs = imgs.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
+
             outputs = model(imgs)
             loss = criterion(outputs, labels)
+
             running_loss += loss.item() * imgs.size(0)
             preds = outputs.argmax(dim=1)
             correct += (preds == labels).sum().item()
             total += labels.size(0)
+
             y_true.extend(labels.cpu().numpy())
             y_pred.extend(preds.cpu().numpy())
 
@@ -35,18 +38,17 @@ def evaluate(model, loader, criterion, device):
 
 
 def compute_inference_latency(model, loader, device, warmup_runs=5):
-    """Compute average inference latency per sample."""
+    """Measure average inference time per sample."""
     import time
 
     model.eval()
 
-    # Warmup
+    # Warmup to avoid CUDA initialization overhead
     dummy = next(iter(loader))[0].to(device)
     with torch.no_grad():
         for _ in range(warmup_runs):
             _ = model(dummy)
 
-    # Measure
     start = time.time()
     total_samples = 0
     with torch.no_grad():
